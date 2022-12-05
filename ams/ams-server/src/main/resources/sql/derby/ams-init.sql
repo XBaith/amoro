@@ -73,12 +73,10 @@ CREATE TABLE optimize_task (
     delete_files bigint DEFAULT NULL,
     base_files bigint DEFAULT NULL,
     pos_delete_files bigint DEFAULT NULL,
-    eq_delete_files bigint DEFAULT NULL,
     insert_file_size bigint DEFAULT NULL,
     delete_file_size bigint DEFAULT NULL,
     base_file_size bigint DEFAULT NULL,
     pos_delete_file_size bigint DEFAULT NULL,
-    eq_delete_file_size bigint DEFAULT NULL,
     source_nodes varchar(2048) DEFAULT NULL,
     is_delete_pos_delete int DEFAULT NULL,
     task_plan_group varchar(40) DEFAULT NULL,
@@ -191,8 +189,6 @@ CREATE TABLE optimize_history (
     base_file_size_before bigint NOT NULL,
     pos_delete_file_cnt_before int NOT NULL,
     pos_delete_file_size_before bigint NOT NULL,
-    eq_delete_file_cnt_before int NOT NULL,
-    eq_delete_file_size_before bigint NOT NULL,
     total_file_cnt_after int NOT NULL,
     total_file_size_after bigint NOT NULL,
     snapshot_id bigint DEFAULT NULL,
@@ -270,4 +266,4 @@ CREATE TABLE platform_file_info (
   PRIMARY KEY (id)
 );
 
-INSERT INTO catalog_metadata(catalog_name,catalog_type,storage_configs,auth_configs, catalog_properties) VALUES ('local_catalog','ams','{"storage.type":"hdfs","hive.site":"PGNvbmZpZ3VyYXRpb24+PC9jb25maWd1cmF0aW9uPg==","hadoop.core.site":"PGNvbmZpZ3VyYXRpb24+PC9jb25maWd1cmF0aW9uPg==","hadoop.hdfs.site":"PGNvbmZpZ3VyYXRpb24+PC9jb25maWd1cmF0aW9uPg=="}','{"auth.type":"simple","auth.simple.hadoop_username":"root"}','{"warehouse.dir":"/tmp/arctic/warehouse","table-formats":"ICEBERG"}');
+INSERT INTO catalog_metadata(catalog_name,catalog_type,storage_configs,auth_configs, catalog_properties) VALUES ('local_catalog','ams','{"storage.type":"hdfs","hive.site":"PGNvbmZpZ3VyYXRpb24+PC9jb25maWd1cmF0aW9uPg==","hadoop.core.site":"PGNvbmZpZ3VyYXRpb24+PC9jb25maWd1cmF0aW9uPg==","hadoop.hdfs.site":"PGNvbmZpZ3VyYXRpb24+PC9jb25maWd1cmF0aW9uPg=="}','{"auth.type":"simple","auth.simple.hadoop_username":"root"}','{"warehouse":"/tmp/arctic/warehouse","table-formats":"MIXED_ICEBERG"}');

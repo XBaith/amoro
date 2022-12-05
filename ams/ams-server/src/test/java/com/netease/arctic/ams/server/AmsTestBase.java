@@ -32,8 +32,8 @@ import com.netease.arctic.ams.server.handler.impl.OptimizeManagerHandler;
 import com.netease.arctic.ams.server.optimize.SupportHiveTestGroup;
 import com.netease.arctic.ams.server.optimize.TestExpireFileCleanSupportIceberg;
 import com.netease.arctic.ams.server.optimize.TestExpiredFileClean;
-import com.netease.arctic.ams.server.optimize.TestIcebergMajorOptimizeCommit;
-import com.netease.arctic.ams.server.optimize.TestIcebergMajorOptimizePlan;
+import com.netease.arctic.ams.server.optimize.TestIcebergFullOptimizeCommit;
+import com.netease.arctic.ams.server.optimize.TestIcebergFullOptimizePlan;
 import com.netease.arctic.ams.server.optimize.TestIcebergMinorOptimizeCommit;
 import com.netease.arctic.ams.server.optimize.TestIcebergMinorOptimizePlan;
 import com.netease.arctic.ams.server.optimize.TestMajorOptimizeCommit;
@@ -108,9 +108,9 @@ import static org.powermock.api.mockito.PowerMockito.when;
     TestMajorOptimizePlan.class,
     TestMinorOptimizeCommit.class,
     TestMinorOptimizePlan.class,
-    TestIcebergMajorOptimizePlan.class,
+    TestIcebergFullOptimizePlan.class,
     TestIcebergMinorOptimizePlan.class,
-    TestIcebergMajorOptimizeCommit.class,
+    TestIcebergFullOptimizeCommit.class,
     TestIcebergMinorOptimizeCommit.class,
     TestExpireFileCleanSupportIceberg.class,
     TestOrphanFileCleanSupportIceberg.class,
@@ -240,7 +240,7 @@ public class AmsTestBase {
             System.getProperty("user.name"));
 
     Map<String, String> catalogProperties = new HashMap<>();
-    catalogProperties.put(CatalogMetaProperties.KEY_WAREHOUSE_DIR, "/tmp");
+    catalogProperties.put(CatalogMetaProperties.KEY_WAREHOUSE, "/tmp");
     CatalogMeta catalogMeta = new CatalogMeta(CATALOG_CONTROLLER_UNITTEST_NAME, CATALOG_TYPE_HADOOP,
             storageConfig, authConfig, catalogProperties);
     List<CatalogMeta> catalogMetas = Lists.newArrayList(catalogMeta);
@@ -265,7 +265,7 @@ public class AmsTestBase {
         System.getProperty("user.name"));
 
     Map<String, String> catalogProperties = new HashMap<>();
-    catalogProperties.put(CatalogMetaProperties.KEY_WAREHOUSE_DIR, tempFolder.newFolder().getPath());
+    catalogProperties.put(CatalogMetaProperties.KEY_WAREHOUSE, tempFolder.newFolder().getPath());
     CatalogMeta catalogMeta = new CatalogMeta(AMS_TEST_CATALOG_NAME, CATALOG_TYPE_HADOOP,
         storageConfig, authConfig, catalogProperties);
     List<CatalogMeta> catalogMetas = Lists.newArrayList(catalogMeta);

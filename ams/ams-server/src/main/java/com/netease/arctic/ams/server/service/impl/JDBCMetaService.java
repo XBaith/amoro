@@ -39,6 +39,7 @@ import com.netease.arctic.table.TableIdentifier;
 import com.netease.arctic.table.TableMetaStore;
 import com.netease.arctic.table.TableProperties;
 import com.netease.arctic.table.UnkeyedTable;
+import com.netease.arctic.utils.CompatiblePropertyUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.iceberg.Table;
@@ -47,6 +48,7 @@ import org.apache.iceberg.hadoop.HadoopTables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -70,7 +72,7 @@ public class JDBCMetaService extends IJDBCService implements IMetaService {
   }
 
   @Override
-  public void createTable(TableMetadata tableMetadata) throws MetaException {
+  public void createTable(TableMetadata tableMetadata) {
     try (SqlSession sqlSession = getSqlSession(false)) {
       try {
         TableMetadataMapper tableMetadataMapper = getMapper(sqlSession, TableMetadataMapper.class);
@@ -87,7 +89,9 @@ public class JDBCMetaService extends IJDBCService implements IMetaService {
     TABLE_META_STORE_CACHE.put(new Key(tableMetadata.getTableIdentifier(), tableMetadata.getMetaStore()),
         tableMetadata.getMetaStore());
     try {
-      ServiceContainer.getOptimizeService().listCachedTables(true);
+      List<TableIdentifier> toAddTables = new ArrayList<>();
+      toAddTables.add(tableMetadata.getTableIdentifier());
+      ServiceContainer.getOptimizeService().addNewTables(toAddTables);
     } catch (Exception e) {
       LOG.warn("createTable success but failed to refresh optimize table cache", e);
     }
@@ -117,9 +121,10 @@ public class JDBCMetaService extends IJDBCService implements IMetaService {
   public void dropTableMetadata(TableIdentifier tableIdentifier,
                                 IInternalTableService internalTableService,
                                 boolean deleteData) throws MetaException {
+    TableMetadata tableMetadata;
     try (SqlSession sqlSession = getSqlSession(false)) {
       TableMetadataMapper tableMetadataMapper = getMapper(sqlSession, TableMetadataMapper.class);
-      TableMetadata tableMetadata = tableMetadataMapper.loadTableMeta(tableIdentifier);
+      tableMetadata = tableMetadataMapper.loadTableMeta(tableIdentifier);
       try {
         tableMetadataMapper.deleteTableMeta(tableIdentifier);
 
@@ -145,6 +150,15 @@ public class JDBCMetaService extends IJDBCService implements IMetaService {
       }
       sqlSession.commit(true);
     }
+
+    TABLE_META_STORE_CACHE.remove(new Key(tableMetadata.getTableIdentifier(), tableMetadata.getMetaStore()));
+    try {
+      List<TableIdentifier> toRemoveTables = new ArrayList<>();
+      toRemoveTables.add(tableMetadata.getTableIdentifier());
+      ServiceContainer.getOptimizeService().clearRemovedTables(toRemoveTables);
+    } catch (Exception e) {
+      LOG.warn("dropTable success but failed to refresh optimize table cache", e);
+    }
   }
 
   @Override
@@ -157,10 +171,10 @@ public class JDBCMetaService extends IJDBCService implements IMetaService {
           oldTableMetaData.getProperties(),
           properties);
       tableMetadataMapper.updateTableProperties(tableIdentifier, properties);
-      String oldQueueName = oldTableMetaData.getProperties().getOrDefault(TableProperties.OPTIMIZE_GROUP,
-          TableProperties.OPTIMIZE_GROUP_DEFAULT);
-      String newQueueName =
-          properties.getOrDefault(TableProperties.OPTIMIZE_GROUP, TableProperties.OPTIMIZE_GROUP_DEFAULT);
+      String oldQueueName = CompatiblePropertyUtil.propertyAsString(oldTableMetaData.getProperties(),
+          TableProperties.SELF_OPTIMIZING_GROUP, TableProperties.SELF_OPTIMIZING_GROUP_DEFAULT);
+      String newQueueName = CompatiblePropertyUtil.propertyAsString(properties,
+          TableProperties.SELF_OPTIMIZING_GROUP, TableProperties.SELF_OPTIMIZING_GROUP_DEFAULT);
       if (StringUtils.isNotBlank(oldQueueName) && StringUtils.isNotBlank(newQueueName) && !oldQueueName.equals(
           newQueueName)) {
         OptimizeQueueItem newOptimizeQueue = ServiceContainer.getOptimizeQueueService().getOptimizeQueue(newQueueName);
