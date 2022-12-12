@@ -38,7 +38,7 @@ WORKDIR /usr/local/ams
 ADD arctic-${ARCTIC_VERSION}-bin.zip /usr/local/ams/arctic-${ARCTIC_VERSION}-bin.zip
 RUN unzip arctic-${ARCTIC_VERSION}-bin.zip \
   && sed -i '/local_catalog/d' /usr/local/ams/arctic-${ARCTIC_VERSION}/conf/derby/ams-init.sql
-
+ADD ./conf/config.yaml /usr/local/ams/arctic-${ARCTIC_VERSION}/conf
 WORKDIR /usr/local/ams/arctic-${ARCTIC_VERSION}
 
 COPY config.sh  ./bin/config.sh
