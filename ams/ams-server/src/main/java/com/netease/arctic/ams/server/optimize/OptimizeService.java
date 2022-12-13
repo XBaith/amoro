@@ -49,8 +49,6 @@ import com.netease.arctic.table.TableIdentifier;
 import com.netease.arctic.table.TableProperties;
 import com.netease.arctic.utils.CatalogUtil;
 import com.netease.arctic.utils.CompatiblePropertyUtil;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.iceberg.util.PropertyUtil;
@@ -334,10 +332,9 @@ public class OptimizeService extends IJDBCService implements IOptimizeService {
         invalidTables.remove(toAddTable);
         success++;
       } catch (Throwable t) {
-        // avoid print too many error logs
+        // avoid printing too many error logs
         if (!invalidTables.contains(toAddTable)) {
           LOG.error("failed to load  " + toAddTable, t);
-        } else {
           invalidTables.add(toAddTable);
         }
       }
