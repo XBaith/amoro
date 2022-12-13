@@ -247,7 +247,7 @@ public class TableExpireService implements ITableExpireService {
           } finally {
             toDeleteFiles.incrementAndGet();
           }
-        }).cleanExpiredFiles(true).commit();
+        }).cleanExpiredFiles(false).commit();
     parentDirectory.forEach(parent -> FileUtil.deleteEmptyDirectory(arcticInternalTable.io(), parent, exclude));
     LOG.info("to delete {} files, success delete {} files", toDeleteFiles.get(), deleteFiles.get());
   }
