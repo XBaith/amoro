@@ -20,7 +20,7 @@
 
 
 if [ -z "$XMX_CONFIG" ]; then
-    XMX_CONFIG="2048"
+    XMX_CONFIG="10240"
 fi
 
 if [ -z "$XMS_CONFIG" ]; then

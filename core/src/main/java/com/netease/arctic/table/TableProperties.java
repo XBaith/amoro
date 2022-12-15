@@ -94,7 +94,7 @@ public class TableProperties {
   public static final int SELF_OPTIMIZING_FRAGMENT_RATIO_DEFAULT = 8;
 
   public static final String SELF_OPTIMIZING_MINOR_TRIGGER_FILE_CNT = "self-optimizing.minor.trigger.file-count";
-  public static final int SELF_OPTIMIZING_MINOR_TRIGGER_FILE_CNT_DEFAULT = 12;
+  public static final int SELF_OPTIMIZING_MINOR_TRIGGER_FILE_CNT_DEFAULT = 32;
 
   public static final String SELF_OPTIMIZING_MINOR_TRIGGER_INTERVAL = "self-optimizing.minor.trigger.interval";
   public static final long SELF_OPTIMIZING_MINOR_TRIGGER_INTERVAL_DEFAULT = 3600000; // 1 h
@@ -104,7 +104,7 @@ public class TableProperties {
   public static final double SELF_OPTIMIZING_MAJOR_TRIGGER_DUPLICATE_RATIO_DEFAULT = 0.5;
 
   public static final String SELF_OPTIMIZING_MAJOR_TRIGGER_FILE_CNT = "self-optimizing.major.trigger.file-count";
-  public static final int SELF_OPTIMIZING_MAJOR_TRIGGER_FILE_CNT_DEFAULT = 12;
+  public static final int SELF_OPTIMIZING_MAJOR_TRIGGER_FILE_CNT_DEFAULT = 32;
 
   public static final String SELF_OPTIMIZING_MAJOR_TRIGGER_INTERVAL = "self-optimizing.major.trigger.interval";
   public static final long SELF_OPTIMIZING_MAJOR_TRIGGER_INTERVAL_DEFAULT = 86400000; // 1 day

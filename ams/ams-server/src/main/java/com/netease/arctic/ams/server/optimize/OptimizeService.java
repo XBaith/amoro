@@ -125,7 +125,7 @@ public class OptimizeService extends IJDBCService implements IOptimizeService {
       }
       List<TableIdentifier> validTables = refreshAndListTables();
       checkTasks.checkRunningTask(
-          new HashSet<>(validTables),
+          validTables,
           identifier -> checkInterval,
           OptimizeCheckTask::new,
           false);
@@ -185,11 +185,13 @@ public class OptimizeService extends IJDBCService implements IOptimizeService {
 
   private void addTableIntoCache(TableOptimizeItem arcticTableItem, Map<String, String> properties,
                                  boolean persistRuntime) {
-    cachedTables.put(arcticTableItem.getTableIdentifier(), arcticTableItem);
+    String groupName = CompatiblePropertyUtil.propertyAsString(properties,
+        TableProperties.SELF_OPTIMIZING_GROUP, TableProperties.SELF_OPTIMIZING_GROUP_DEFAULT);
     try {
-      String groupName = CompatiblePropertyUtil.propertyAsString(properties,
-          TableProperties.SELF_OPTIMIZING_GROUP, TableProperties.SELF_OPTIMIZING_GROUP_DEFAULT);
-      optimizeQueueService.bind(arcticTableItem.getTableIdentifier(), groupName);
+      if (!TableProperties.SELF_OPTIMIZING_GROUP_DEFAULT.equals(groupName)) {
+        cachedTables.put(arcticTableItem.getTableIdentifier(), arcticTableItem);
+        optimizeQueueService.bind(arcticTableItem.getTableIdentifier(), groupName);
+      }
     } catch (InvalidObjectException e) {
       LOG.debug("failed to bind " + arcticTableItem.getTableIdentifier() + " and queue ", e);
     }

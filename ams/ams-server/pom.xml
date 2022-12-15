@@ -519,7 +519,11 @@
             <version>1.6.0-incubating</version>
         </dependency>
 
-
+        <dependency>
+            <groupId>org.mapdb</groupId>
+            <artifactId>mapdb</artifactId>
+            <version>3.0.5</version>
+        </dependency>
     </dependencies>
 
     <build>

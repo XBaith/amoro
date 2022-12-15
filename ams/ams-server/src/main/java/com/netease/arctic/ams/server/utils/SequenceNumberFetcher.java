@@ -22,9 +22,11 @@ import com.netease.arctic.scan.TableEntriesScan;
 import org.apache.iceberg.FileContent;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
-import org.apache.iceberg.relocated.com.google.common.collect.Maps;
 
 import java.util.Map;
+import org.mapdb.DB;
+import org.mapdb.DBMaker;
+import org.mapdb.Serializer;
 
 /**
  * Utils to get the sequence number of iceberg file.
@@ -34,6 +36,11 @@ public class SequenceNumberFetcher {
   private final Table table;
   private final long snapshotId;
   private volatile Map<String, Long> cached;
+  private final DB db =
+      DBMaker.tempFileDB()
+          .fileMmapEnableIfSupported()
+          .transactionEnable()
+          .closeOnJvmShutdown().make();
 
   public static SequenceNumberFetcher with(Table table, long snapshotId) {
     return new SequenceNumberFetcher(table, snapshotId);
@@ -58,13 +65,16 @@ public class SequenceNumberFetcher {
 
   private Map<String, Long> getCached() {
     if (cached == null) {
-      cached = Maps.newHashMap();
+      cached = db.hashMap("fileSeqNumberMap", Serializer.STRING, Serializer.LONG)
+          .expireAfterGet()
+          .createOrOpen();
       TableEntriesScan manifestReader = TableEntriesScan.builder(table)
           .withAliveEntry(true)
           .includeFileContent(FileContent.DATA, FileContent.POSITION_DELETES, FileContent.EQUALITY_DELETES)
           .useSnapshot(snapshotId)
           .build();
       manifestReader.entries().forEach(e -> cached.put(e.getFile().path().toString(), e.getSequenceNumber()));
+      db.commit();
     }
     return cached;
   }

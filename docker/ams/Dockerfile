@@ -17,7 +17,7 @@
 
 FROM openjdk:8u332-jdk
 
-ARG ARCTIC_VERSION=0.4.0-SNAPSHOT
+ARG ARCTIC_VERSION=0.5.0-SNAPSHOT
 ARG RELEASE=v0.3.2-rc1
 ARG DEBIAN_MIRROR=http://deb.debian.org
 
@@ -36,9 +36,9 @@ ARG AMS_FILE
 WORKDIR /usr/local/ams
 
 ADD arctic-${ARCTIC_VERSION}-bin.zip /usr/local/ams/arctic-${ARCTIC_VERSION}-bin.zip
-RUN unzip arctic-${ARCTIC_VERSION}-bin.zip \
-  && sed -i '/local_catalog/d' /usr/local/ams/arctic-${ARCTIC_VERSION}/conf/derby/ams-init.sql
+RUN unzip arctic-${ARCTIC_VERSION}-bin.zip
 ADD ./conf/config.yaml /usr/local/ams/arctic-${ARCTIC_VERSION}/conf
+ADD ./ams.sh /usr/local/ams/arctic-${ARCTIC_VERSION}/bin
 WORKDIR /usr/local/ams/arctic-${ARCTIC_VERSION}
 
 COPY config.sh  ./bin/config.sh
@@ -47,7 +47,8 @@ RUN mkdir -p ./logs && touch ./logs/ams-info.log
 
 
 EXPOSE 1630/tcp
-EXPOSE 1260/tcp
+EXPOSE 9093/tcp
+EXPOSE 9995/tcp
 
 CMD ["bash","-c","./bin/ams.sh start && tail -f ./logs/ams-info.log"]
 
