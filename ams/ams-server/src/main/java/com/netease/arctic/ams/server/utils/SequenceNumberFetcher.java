@@ -18,37 +18,53 @@
 
 package com.netease.arctic.ams.server.utils;
 
+import com.netease.arctic.IcebergFileEntry;
 import com.netease.arctic.scan.TableEntriesScan;
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import org.apache.iceberg.FileContent;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 
 import java.util.Map;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
+import org.mapdb.HTreeMap;
 import org.mapdb.Serializer;
 
 /**
  * Utils to get the sequence number of iceberg file.
  * If iceberg table is v1 format, will always return 0.
  */
-public class SequenceNumberFetcher {
+public class SequenceNumberFetcher implements Closeable {
   private final Table table;
   private final long snapshotId;
-  private volatile Map<String, Long> cached;
-  private final DB db =
-      DBMaker.tempFileDB()
-          .fileMmapEnableIfSupported()
-          .transactionEnable()
-          .closeOnJvmShutdown().make();
+  private volatile HTreeMap<String, Long> cached;
+  private DB db;
 
   public static SequenceNumberFetcher with(Table table, long snapshotId) {
     return new SequenceNumberFetcher(table, snapshotId);
   }
 
+  private DB connectDB() {
+    if (null != this.db && !db.isClosed()) {
+      return db;
+    } else {
+      return DBMaker.tempFileDB()
+          .fileMmapEnableIfSupported()
+          .closeOnJvmShutdown()
+          .fileLockDisable()
+          .transactionEnable()
+          .make();
+    }
+  }
+
   public SequenceNumberFetcher(Table table, long snapshotId) {
     this.table = table;
     this.snapshotId = snapshotId;
+    db = connectDB();
   }
 
   /**
@@ -65,7 +81,7 @@ public class SequenceNumberFetcher {
 
   private Map<String, Long> getCached() {
     if (cached == null) {
-      cached = db.hashMap("fileSeqNumberMap", Serializer.STRING, Serializer.LONG)
+      cached = connectDB().hashMap("fileSeqNumberMap-" + snapshotId, Serializer.STRING, Serializer.LONG)
           .expireAfterGet()
           .createOrOpen();
       TableEntriesScan manifestReader = TableEntriesScan.builder(table)
@@ -73,9 +89,22 @@ public class SequenceNumberFetcher {
           .includeFileContent(FileContent.DATA, FileContent.POSITION_DELETES, FileContent.EQUALITY_DELETES)
           .useSnapshot(snapshotId)
           .build();
-      manifestReader.entries().forEach(e -> cached.put(e.getFile().path().toString(), e.getSequenceNumber()));
-      db.commit();
+      try (CloseableIterable<IcebergFileEntry> entries = manifestReader.entries()) {
+        entries.forEach(e -> cached.put(e.getFile().path().toString(), e.getSequenceNumber()));
+      } catch (IOException e) {
+        throw new UncheckedIOException("Failed to close metadata table scan of " + table.name(), e);
+      }
+      connectDB().commit();
+    } else if (cached.isClosed()) {
+      cached = connectDB().hashMap("fileSeqNumberMap-" + snapshotId, Serializer.STRING, Serializer.LONG)
+          .expireAfterGet().open();
     }
     return cached;
+  }
+
+  @Override
+  public void close() throws IOException {
+    cached.clear();
+    db.close();
   }
 }

@@ -25,6 +25,7 @@ import com.netease.arctic.ams.server.model.TaskConfig;
 import com.netease.arctic.ams.server.utils.SequenceNumberFetcher;
 import com.netease.arctic.table.ArcticTable;
 import com.netease.arctic.table.TableProperties;
+import java.io.IOException;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DeleteFile;
@@ -134,17 +135,18 @@ public class IcebergFullOptimizePlan extends BaseIcebergOptimizePlan {
     List<List<FileScanTask>> binPackFileScanTasks = binPackFileScanTask(fileScanTasks);
 
     if (CollectionUtils.isNotEmpty(binPackFileScanTasks)) {
-      SequenceNumberFetcher sequenceNumberFetcher = new SequenceNumberFetcher(
-          arcticTable.asUnkeyedTable(), currentSnapshotId);
-      for (List<FileScanTask> fileScanTask : binPackFileScanTasks) {
-        List<DataFile> dataFiles = new ArrayList<>();
-        List<DeleteFile> eqDeleteFiles = new ArrayList<>();
-        List<DeleteFile> posDeleteFiles = new ArrayList<>();
-        getOptimizeFile(fileScanTask, dataFiles, eqDeleteFiles, posDeleteFiles);
+      try (SequenceNumberFetcher sequenceNumberFetcher = new SequenceNumberFetcher(
+          arcticTable.asUnkeyedTable(), currentSnapshotId)) {
+        for (List<FileScanTask> fileScanTask : binPackFileScanTasks) {
+          List<DataFile> dataFiles = new ArrayList<>();
+          List<DeleteFile> eqDeleteFiles = new ArrayList<>();
+          List<DeleteFile> posDeleteFiles = new ArrayList<>();
+          getOptimizeFile(fileScanTask, dataFiles, eqDeleteFiles, posDeleteFiles);
 
-        collector.add(buildOptimizeTask(Collections.emptyList(), dataFiles,
-            eqDeleteFiles, posDeleteFiles, sequenceNumberFetcher, taskPartitionConfig));
-      }
+          collector.add(buildOptimizeTask(Collections.emptyList(), dataFiles,
+              eqDeleteFiles, posDeleteFiles, sequenceNumberFetcher, taskPartitionConfig));
+        }
+      } catch (IOException ignored) {}
     }
 
 

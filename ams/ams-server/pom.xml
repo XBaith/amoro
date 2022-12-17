@@ -524,6 +524,16 @@
             <artifactId>mapdb</artifactId>
             <version>3.0.5</version>
         </dependency>
+        <dependency>
+            <groupId>org.rocksdb</groupId>
+            <artifactId>rocksdbjni</artifactId>
+            <version>7.7.3</version>
+        </dependency>
+        <dependency>
+            <groupId>com.esotericsoftware</groupId>
+            <artifactId>kryo</artifactId>
+            <version>4.0.0</version>
+        </dependency>
     </dependencies>
 
     <build>

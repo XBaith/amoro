@@ -26,6 +26,7 @@ import com.netease.arctic.ams.server.utils.SequenceNumberFetcher;
 import com.netease.arctic.table.ArcticTable;
 import com.netease.arctic.table.TableProperties;
 import com.netease.arctic.utils.CompatiblePropertyUtil;
+import java.io.IOException;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DeleteFile;
@@ -167,21 +168,22 @@ public class IcebergMinorOptimizePlan extends BaseIcebergOptimizePlan {
     List<List<FileScanTask>> packedList = binPackFileScanTask(smallFileScanTasks);
 
     if (CollectionUtils.isNotEmpty(packedList)) {
-      SequenceNumberFetcher sequenceNumberFetcher = new SequenceNumberFetcher(
-          arcticTable.asUnkeyedTable(), currentSnapshotId);
-      for (List<FileScanTask> fileScanTasks : packedList) {
-        List<DataFile> dataFiles = new ArrayList<>();
-        List<DeleteFile> eqDeleteFiles = new ArrayList<>();
-        List<DeleteFile> posDeleteFiles = new ArrayList<>();
-        getOptimizeFile(fileScanTasks, dataFiles, eqDeleteFiles, posDeleteFiles);
+      try (SequenceNumberFetcher sequenceNumberFetcher = new SequenceNumberFetcher(
+          arcticTable.asUnkeyedTable(), currentSnapshotId)) {
+        for (List<FileScanTask> fileScanTasks : packedList) {
+          List<DataFile> dataFiles = new ArrayList<>();
+          List<DeleteFile> eqDeleteFiles = new ArrayList<>();
+          List<DeleteFile> posDeleteFiles = new ArrayList<>();
+          getOptimizeFile(fileScanTasks, dataFiles, eqDeleteFiles, posDeleteFiles);
 
-        // only return tasks with at least 2 files
-        int totalFileCnt = dataFiles.size() + eqDeleteFiles.size() + posDeleteFiles.size();
-        if (totalFileCnt > 1) {
-          collector.add(buildOptimizeTask(dataFiles, Collections.emptyList(),
-              eqDeleteFiles, posDeleteFiles, sequenceNumberFetcher, taskPartitionConfig));
+          // only return tasks with at least 2 files
+          int totalFileCnt = dataFiles.size() + eqDeleteFiles.size() + posDeleteFiles.size();
+          if (totalFileCnt > 1) {
+            collector.add(buildOptimizeTask(dataFiles, Collections.emptyList(),
+                eqDeleteFiles, posDeleteFiles, sequenceNumberFetcher, taskPartitionConfig));
+          }
         }
-      }
+      } catch (IOException ignore) {}
     }
 
     return collector;
@@ -203,20 +205,21 @@ public class IcebergMinorOptimizePlan extends BaseIcebergOptimizePlan {
     List<List<FileScanTask>> packedList = binPackFileScanTask(allNeedOptimizeTask);
 
     if (CollectionUtils.isNotEmpty(packedList)) {
-      SequenceNumberFetcher sequenceNumberFetcher = new SequenceNumberFetcher(
-          arcticTable.asUnkeyedTable(), currentSnapshotId);
-      for (List<FileScanTask> fileScanTasks : packedList) {
-        List<DataFile> dataFiles = new ArrayList<>();
-        List<DeleteFile> eqDeleteFiles = new ArrayList<>();
-        List<DeleteFile> posDeleteFiles = new ArrayList<>();
-        getOptimizeFile(fileScanTasks, dataFiles, eqDeleteFiles, posDeleteFiles);
+      try (SequenceNumberFetcher sequenceNumberFetcher = new SequenceNumberFetcher(
+          arcticTable.asUnkeyedTable(), currentSnapshotId)) {
+        for (List<FileScanTask> fileScanTasks : packedList) {
+          List<DataFile> dataFiles = new ArrayList<>();
+          List<DeleteFile> eqDeleteFiles = new ArrayList<>();
+          List<DeleteFile> posDeleteFiles = new ArrayList<>();
+          getOptimizeFile(fileScanTasks, dataFiles, eqDeleteFiles, posDeleteFiles);
 
-        int totalFileCnt = dataFiles.size() + eqDeleteFiles.size() + posDeleteFiles.size();
-        Preconditions.checkArgument(totalFileCnt > 1, "task only have " + totalFileCnt + " files");
+          int totalFileCnt = dataFiles.size() + eqDeleteFiles.size() + posDeleteFiles.size();
+          Preconditions.checkArgument(totalFileCnt > 1, "task only have " + totalFileCnt + " files");
 
-        collector.add(buildOptimizeTask(Collections.emptyList(), dataFiles,
-            eqDeleteFiles, posDeleteFiles, sequenceNumberFetcher, taskPartitionConfig));
-      }
+          collector.add(buildOptimizeTask(Collections.emptyList(), dataFiles,
+              eqDeleteFiles, posDeleteFiles, sequenceNumberFetcher, taskPartitionConfig));
+        }
+      } catch (IOException ignore) {}
     }
 
     return collector;
