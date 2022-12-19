@@ -125,7 +125,7 @@ public class OptimizeService extends IJDBCService implements IOptimizeService {
       }
       List<TableIdentifier> validTables = refreshAndListTables();
       checkTasks.checkRunningTask(
-          validTables,
+          new HashSet<>(validTables),
           identifier -> checkInterval,
           OptimizeCheckTask::new,
           false);

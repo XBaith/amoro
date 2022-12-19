@@ -18,7 +18,6 @@
 
 package com.netease.arctic.ams.server.utils;
 
-import com.google.common.collect.Sets;
 import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -120,13 +119,13 @@ public class ScheduledTasks<K, T extends ScheduledTasks.Task> {
    * @param ids task ids
    * @return ids removed
    */
-  public Set<K> removeLegacyTaskFromScheduler(Iterable<K> ids, boolean mayInterruptIfRunning) {
-    Set<K> idSet = Sets.newHashSet(ids);
+  public Set<K> removeLegacyTaskFromScheduler(Set<K> ids, boolean mayInterruptIfRunning) {
+
     Set<K> removed = new HashSet<>();
     Iterator<Map.Entry<K, TaskWrapper<T>>> iterator = taskMap.entrySet().iterator();
     while (iterator.hasNext()) {
       Map.Entry<K, TaskWrapper<T>> entry = iterator.next();
-      if (!idSet.contains(entry.getKey())) {
+      if (!ids.contains(entry.getKey())) {
         ScheduledFuture<?> scheduledTask = entry.getValue().future;
         if (scheduledTask != null) {
           scheduledTask.cancel(mayInterruptIfRunning);
@@ -212,7 +211,7 @@ public class ScheduledTasks<K, T extends ScheduledTasks.Task> {
    * @param taskFactory           - build task
    * @param mayInterruptIfRunning - interrupt task when cancel
    */
-  public synchronized void checkRunningTask(Iterable<K> validKeys,
+  public synchronized void checkRunningTask(Set<K> validKeys,
                                             Function<K, Long> intervalSupplier,
                                             Function<K, T> taskFactory,
                                             boolean mayInterruptIfRunning) {
