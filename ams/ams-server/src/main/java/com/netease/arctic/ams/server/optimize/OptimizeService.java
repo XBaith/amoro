@@ -185,13 +185,11 @@ public class OptimizeService extends IJDBCService implements IOptimizeService {
 
   private void addTableIntoCache(TableOptimizeItem arcticTableItem, Map<String, String> properties,
                                  boolean persistRuntime) {
-    String groupName = CompatiblePropertyUtil.propertyAsString(properties,
-        TableProperties.SELF_OPTIMIZING_GROUP, TableProperties.SELF_OPTIMIZING_GROUP_DEFAULT);
+    cachedTables.put(arcticTableItem.getTableIdentifier(), arcticTableItem);
     try {
-      if (!TableProperties.SELF_OPTIMIZING_GROUP_DEFAULT.equals(groupName)) {
-        cachedTables.put(arcticTableItem.getTableIdentifier(), arcticTableItem);
-        optimizeQueueService.bind(arcticTableItem.getTableIdentifier(), groupName);
-      }
+      String groupName = CompatiblePropertyUtil.propertyAsString(properties,
+          TableProperties.SELF_OPTIMIZING_GROUP, TableProperties.SELF_OPTIMIZING_GROUP_DEFAULT);
+      optimizeQueueService.bind(arcticTableItem.getTableIdentifier(), groupName);
     } catch (InvalidObjectException e) {
       LOG.debug("failed to bind " + arcticTableItem.getTableIdentifier() + " and queue ", e);
     }
@@ -243,6 +241,7 @@ public class OptimizeService extends IJDBCService implements IOptimizeService {
         arcticTableItem.initTableOptimizeRuntime(oldTableOptimizeRuntime)
             .initOptimizeTasks(tableOptimizeTasks);
         addTableIntoCache(arcticTableItem, tableMetadata.getProperties(), oldTableOptimizeRuntime == null);
+        arcticTableItem.clear();
       } catch (Throwable t) {
         LOG.error("failed to load  " + tableIdentifier, t);
         invalidTables.add(tableIdentifier);
@@ -330,6 +329,7 @@ public class OptimizeService extends IJDBCService implements IOptimizeService {
             TableProperties.TABLE_CREATE_TIME_DEFAULT);
         newTableItem.getTableOptimizeRuntime().setOptimizeStatusStartTime(createTime);
         addTableIntoCache(newTableItem, arcticTable.properties(), true);
+        newTableItem.clear();
         // remove recover table if it is present
         invalidTables.remove(toAddTable);
         success++;

@@ -672,13 +672,8 @@ public class OptimizeQueueService extends IJDBCService {
               LOG.debug("table {} not changed, no need plan", tableIdentifier);
               continue;
             }
-            List<FileScanTask> fileScanTasks;
-            try (CloseableIterable<FileScanTask> filesIterable = 
-                     tableItem.getArcticTable(false).asUnkeyedTable().newScan().planFiles()) {
-              fileScanTasks = Lists.newArrayList(filesIterable);
-            } catch (IOException e) {
-              throw new UncheckedIOException("Failed to close table scan of " + tableIdentifier, e);
-            }
+            List<FileScanTask> fileScanTasks =
+                tableItem.fetchFileScanTasks(tableItem.getArcticTable().asUnkeyedTable().currentSnapshot().snapshotId());
 
             optimizePlan = tableItem.getIcebergFullPlan(fileScanTasks, queueId, currentTime, partitionIsRunning);
             optimizeTasks = optimizePlan.plan();

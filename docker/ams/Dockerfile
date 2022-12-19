@@ -38,7 +38,7 @@ WORKDIR /usr/local/ams
 ADD arctic-${ARCTIC_VERSION}-bin.zip /usr/local/ams/arctic-${ARCTIC_VERSION}-bin.zip
 RUN unzip arctic-${ARCTIC_VERSION}-bin.zip
 ADD ./conf/config.yaml /usr/local/ams/arctic-${ARCTIC_VERSION}/conf
-ADD ./ams.sh /usr/local/ams/arctic-${ARCTIC_VERSION}/bin
+#ADD ./ams.sh /usr/local/ams/arctic-${ARCTIC_VERSION}/bin
 WORKDIR /usr/local/ams/arctic-${ARCTIC_VERSION}
 
 COPY config.sh  ./bin/config.sh

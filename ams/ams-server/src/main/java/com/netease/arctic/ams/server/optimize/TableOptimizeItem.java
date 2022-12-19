@@ -41,6 +41,7 @@ import com.netease.arctic.ams.server.model.OptimizeHistory;
 import com.netease.arctic.ams.server.model.TableMetadata;
 import com.netease.arctic.ams.server.model.TableOptimizeInfo;
 import com.netease.arctic.ams.server.model.TableOptimizeRuntime;
+import com.netease.arctic.ams.server.rocksdb.RocksDbDiskMap;
 import com.netease.arctic.ams.server.service.IJDBCService;
 import com.netease.arctic.ams.server.service.IQuotaService;
 import com.netease.arctic.ams.server.service.ServiceContainer;
@@ -123,6 +124,8 @@ public class TableOptimizeItem extends IJDBCService {
     }
   };
 
+  private final Map<Long, ArrayList<FileScanTask>> fileScanMap;
+
   public TableOptimizeItem(ArcticTable arcticTable, TableMetadata tableMetadata) {
     this.arcticTable = arcticTable;
     this.metaRefreshTime = -1;
@@ -137,6 +140,15 @@ public class TableOptimizeItem extends IJDBCService {
     this.fileInfoCacheService = ServiceContainer.getFileInfoCacheService();
     this.metastoreClient = ServiceContainer.getTableMetastoreHandler();
     this.quotaService = ServiceContainer.getQuotaService();
+    try {
+      fileScanMap = new RocksDbDiskMap<>("optimize_" + tableIdentifier.toString().replaceAll("\\.", "_"));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public void clear() {
+    fileScanMap.clear();
   }
 
   /**
@@ -387,6 +399,21 @@ public class TableOptimizeItem extends IJDBCService {
     return tableOptimizeInfo;
   }
 
+  public List<FileScanTask> fetchFileScanTasks(Long snapshotId) {
+    if (fileScanMap.containsKey(snapshotId)) {
+      return fileScanMap.get(snapshotId);
+    } else {
+      try (CloseableIterable<FileScanTask> filesIterable = arcticTable.asUnkeyedTable().newScan()
+          .useSnapshot(snapshotId).planFiles()) {
+        ArrayList<FileScanTask> lightScan = new ArrayList<>();
+        filesIterable.forEach(t -> lightScan.add(new IcebergBaseFileScanTask(t)));
+        return fileScanMap.put(snapshotId, lightScan);
+      } catch (IOException e) {
+        throw new UncheckedIOException("Failed to close table scan of " + tableIdentifier, e);
+      }
+    }
+  }
+
   /**
    * Refresh and update table optimize status.
    */
@@ -422,12 +449,8 @@ public class TableOptimizeItem extends IJDBCService {
     } else {
       Map<String, Boolean> partitionIsRunning = generatePartitionRunning();
       if (com.netease.arctic.utils.TableTypeUtil.isIcebergTableFormat(getArcticTable())) {
-        List<FileScanTask> fileScanTasks;
-        try (CloseableIterable<FileScanTask> filesIterable = arcticTable.asUnkeyedTable().newScan().planFiles()) {
-          fileScanTasks = Lists.newArrayList(filesIterable);
-        } catch (IOException e) {
-          throw new UncheckedIOException("Failed to close table scan of " + tableIdentifier, e);
-        }
+        Long curSnapshotId = arcticTable.asUnkeyedTable().currentSnapshot().snapshotId();
+        List<FileScanTask> fileScanTasks = fetchFileScanTasks(curSnapshotId);
         IcebergFullOptimizePlan fullPlan =
             getIcebergFullPlan(fileScanTasks, -1, System.currentTimeMillis(), partitionIsRunning);
         List<BaseOptimizeTask> fullTasks = fullPlan.plan();
