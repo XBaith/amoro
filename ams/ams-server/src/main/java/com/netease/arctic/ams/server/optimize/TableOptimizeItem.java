@@ -424,9 +424,9 @@ public class TableOptimizeItem extends IJDBCService {
       tryUpdateOptimizeInfo(TableOptimizeRuntime.OptimizeStatus.Idle, Collections.emptyList(), null);
     } else {
       if (com.netease.arctic.utils.TableTypeUtil.isIcebergTableFormat(getArcticTable())) {
-        List<FileScanTask> fileScanTasks;
+        List<FileScanTask> fileScanTasks = new ArrayList<>();
         try (CloseableIterable<FileScanTask> filesIterable = arcticTable.asUnkeyedTable().newScan().planFiles()) {
-          fileScanTasks = Lists.newArrayList(filesIterable);
+          filesIterable.forEach(t -> fileScanTasks.add(new LiteBaseFileScanTask(t)));
         } catch (IOException e) {
           throw new UncheckedIOException("Failed to close table scan of " + tableIdentifier, e);
         }

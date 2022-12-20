@@ -77,7 +77,8 @@ public class OptimizeService extends IJDBCService implements IOptimizeService {
   private final BlockingQueue<TableOptimizeItem> toCommitTables = new ArrayBlockingQueue<>(1000);
 
   private final ConcurrentHashMap<TableIdentifier, TableOptimizeItem> cachedTables = new ConcurrentHashMap<>();
-  private final Set<TableIdentifier> invalidTables = Collections.synchronizedSet(new HashSet<>());
+  private final ThreadLocal<Set<TableIdentifier>> invalidTables =
+      ThreadLocal.withInitial(() -> Collections.synchronizedSet(new HashSet<>(1000)));
 
   private final OptimizeQueueService optimizeQueueService;
   private final IMetaService metaService;
@@ -243,7 +244,7 @@ public class OptimizeService extends IJDBCService implements IOptimizeService {
         addTableIntoCache(arcticTableItem, tableMetadata.getProperties(), oldTableOptimizeRuntime == null);
       } catch (Throwable t) {
         LOG.error("failed to load  " + tableIdentifier, t);
-        invalidTables.add(tableIdentifier);
+        invalidTables.get().add(tableIdentifier);
       }
     }
 
@@ -329,13 +330,13 @@ public class OptimizeService extends IJDBCService implements IOptimizeService {
         newTableItem.getTableOptimizeRuntime().setOptimizeStatusStartTime(createTime);
         addTableIntoCache(newTableItem, arcticTable.properties(), true);
         // remove recover table if it is present
-        invalidTables.remove(toAddTable);
+        invalidTables.get().remove(toAddTable);
         success++;
       } catch (Throwable t) {
         // avoid printing too many error logs
-        if (!invalidTables.contains(toAddTable)) {
+        if (!invalidTables.get().contains(toAddTable)) {
           LOG.error("failed to load  " + toAddTable, t);
-          invalidTables.add(toAddTable);
+          invalidTables.get().add(toAddTable);
         }
       }
     }

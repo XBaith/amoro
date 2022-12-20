@@ -630,7 +630,7 @@ public class TableMetaStore implements Serializable {
         throw new IllegalArgumentException("Unsupported auth method:" + authMethod);
       }
 
-      LOG.info("Construct TableMetaStore with authMethod:{}, hadoopUsername:{}, krbPrincipal:{}",
+      LOG.debug("Construct TableMetaStore with authMethod:{}, hadoopUsername:{}, krbPrincipal:{}",
           authMethod, hadoopUsername, krbPrincipal);
       TableMetaStore metaStore =
           new TableMetaStore(metaStoreSite, hdfsSite, coreSite, authMethod, hadoopUsername,

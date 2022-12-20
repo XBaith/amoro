@@ -119,7 +119,7 @@ public class CatalogUtil {
       if (catalogMeta.getAuthConfigs() != null) {
         Map<String, String> authConfigs = catalogMeta.getAuthConfigs();
         String authType = authConfigs.get(CatalogMetaProperties.AUTH_CONFIGS_KEY_TYPE);
-        LOG.info("TableMetaStore use auth config in catalog meta, authType is {}", authType);
+        LOG.debug("TableMetaStore use auth config in catalog meta, authType is {}", authType);
         if (CatalogMetaProperties.AUTH_CONFIGS_VALUE_TYPE_SIMPLE.equalsIgnoreCase(authType)) {
           String hadoopUsername = authConfigs.get(CatalogMetaProperties.AUTH_CONFIGS_KEY_HADOOP_USERNAME);
           builder.withSimpleAuth(hadoopUsername);

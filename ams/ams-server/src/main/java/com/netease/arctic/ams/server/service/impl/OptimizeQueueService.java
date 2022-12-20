@@ -38,6 +38,7 @@ import com.netease.arctic.ams.server.model.TableQuotaInfo;
 import com.netease.arctic.ams.server.model.TableTaskHistory;
 import com.netease.arctic.ams.server.optimize.BaseIcebergOptimizePlan;
 import com.netease.arctic.ams.server.optimize.BaseOptimizePlan;
+import com.netease.arctic.ams.server.optimize.LiteBaseFileScanTask;
 import com.netease.arctic.ams.server.optimize.OptimizeTaskItem;
 import com.netease.arctic.ams.server.optimize.TableOptimizeItem;
 import com.netease.arctic.ams.server.service.IJDBCService;
@@ -55,12 +56,15 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.ibatis.session.SqlSession;
+import org.apache.iceberg.BaseMetastoreCatalog;
+import org.apache.iceberg.BaseMetastoreTableOperations;
 import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.iceberg.relocated.com.google.common.collect.Sets;
+import org.apache.log4j.Level;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,6 +107,9 @@ public class OptimizeQueueService extends IJDBCService {
     LOG.info("OptimizeQueueManager init");
     loadOptimizeQueues();
     LOG.info("OptimizeQueueManager init completed");
+    org.apache.log4j.Logger.getLogger(org.apache.iceberg.BaseMetastoreCatalog.class).setLevel(Level.WARN);
+    org.apache.log4j.Logger.getLogger(org.apache.iceberg.BaseMetastoreTableOperations.class).setLevel(Level.WARN);
+    org.apache.log4j.Logger.getLogger(org.apache.iceberg.DataTableScan.class).setLevel(Level.WARN);
   }
 
   public int getQueueId(Map<String, String> properties) throws InvalidObjectException {
@@ -488,7 +495,8 @@ public class OptimizeQueueService extends IJDBCService {
 
                 long threadStartTime = System.currentTimeMillis();
                 try {
-                  LOG.info("this plan started {}, {}", attemptId, jobId);
+                  LOG.info("Optimizer plan started {}, {} from {}", attemptId, jobId,
+                      getOptimizeQueueItem().getOptimizeQueueMeta().getName());
                   while (retry <= retryTime) {
                     LOG.debug("start get plan task retry {}", retry);
                     retry++;
@@ -516,7 +524,7 @@ public class OptimizeQueueService extends IJDBCService {
                   LOG.error("failed to plan", t);
                   throw t;
                 } finally {
-                  LOG.info("this plan end {}, cost {} ms, retry {}",
+                  LOG.info("Optimizer plan end {}, cost {} ms, retry {}",
                       attemptId, System.currentTimeMillis() - threadStartTime, retry);
                   if (planThreadStarted.compareAndSet(true, false)) {
                     lock();
@@ -537,7 +545,7 @@ public class OptimizeQueueService extends IJDBCService {
                 // if timeout, return null
                 if (!planThreadCondition.await(waitTime - (System.currentTimeMillis() - startTime),
                     TimeUnit.MILLISECONDS)) {
-                  LOG.debug("The queue {} has no task have planned", optimizeQueue.getOptimizeQueueMeta().getQueueId());
+                  LOG.info("The queue {} has no task have planned", optimizeQueue.getOptimizeQueueMeta().getName());
                   return null;
                 }
               } finally {
@@ -672,10 +680,10 @@ public class OptimizeQueueService extends IJDBCService {
                   tableIdentifier);
               continue;
             }
-            List<FileScanTask> fileScanTasks;
-            try (CloseableIterable<FileScanTask> filesIterable = 
-                     tableItem.getArcticTable(false).asUnkeyedTable().newScan().planFiles()) {
-              fileScanTasks = Lists.newArrayList(filesIterable);
+            List<FileScanTask> fileScanTasks = new ArrayList<>();
+            try (CloseableIterable<FileScanTask> filesIterable =
+                tableItem.getArcticTable(false).asUnkeyedTable().newScan().planFiles()) {
+              filesIterable.forEach(t -> fileScanTasks.add(new LiteBaseFileScanTask(t)));
             } catch (IOException e) {
               throw new UncheckedIOException("Failed to close table scan of " + tableIdentifier, e);
             }
