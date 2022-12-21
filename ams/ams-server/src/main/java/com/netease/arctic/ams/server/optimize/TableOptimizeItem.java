@@ -23,7 +23,6 @@ import com.netease.arctic.ams.api.AlreadyExistsException;
 import com.netease.arctic.ams.api.Constants;
 import com.netease.arctic.ams.api.DataFileInfo;
 import com.netease.arctic.ams.api.ErrorMessage;
-import com.netease.arctic.ams.api.InvalidObjectException;
 import com.netease.arctic.ams.api.OptimizeRangeType;
 import com.netease.arctic.ams.api.OptimizeStatus;
 import com.netease.arctic.ams.api.OptimizeTaskId;
@@ -39,7 +38,6 @@ import com.netease.arctic.ams.server.model.BaseOptimizeTaskRuntime;
 import com.netease.arctic.ams.server.model.CoreInfo;
 import com.netease.arctic.ams.server.model.FilesStatistics;
 import com.netease.arctic.ams.server.model.OptimizeHistory;
-import com.netease.arctic.ams.server.model.OptimizeQueueItem;
 import com.netease.arctic.ams.server.model.TableMetadata;
 import com.netease.arctic.ams.server.model.TableOptimizeInfo;
 import com.netease.arctic.ams.server.model.TableOptimizeRuntime;
@@ -47,8 +45,8 @@ import com.netease.arctic.ams.server.service.IJDBCService;
 import com.netease.arctic.ams.server.service.IQuotaService;
 import com.netease.arctic.ams.server.service.ServiceContainer;
 import com.netease.arctic.ams.server.service.impl.FileInfoCacheService;
-import com.netease.arctic.ams.server.service.impl.OptimizeQueueService;
 import com.netease.arctic.ams.server.utils.FilesStatisticsBuilder;
+import com.netease.arctic.ams.server.utils.TableOptimizeStatusUtil;
 import com.netease.arctic.ams.server.utils.TableStatCollector;
 import com.netease.arctic.ams.server.utils.UnKeyedTableUtil;
 import com.netease.arctic.catalog.ArcticCatalog;
@@ -69,7 +67,6 @@ import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.relocated.com.google.common.base.Predicate;
-import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.iceberg.util.PropertyUtil;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.slf4j.Logger;
@@ -390,93 +387,120 @@ public class TableOptimizeItem extends IJDBCService {
     return tableOptimizeInfo;
   }
 
+  private boolean shouldContinueOptimizing() {
+    if (this.optimizeTasks.isEmpty()) {
+      return false;
+    }
+
+    tasksLock.lock();
+    try {
+      if (!this.optimizeTasks.isEmpty()) {
+        List<BaseOptimizeTask> optimizeTasks =
+            this.optimizeTasks.values().stream().map(OptimizeTaskItem::getOptimizeTask).collect(
+                Collectors.toList());
+        if (hasFullOptimizeTask()) {
+          tryUpdateOptimizeInfo(
+              TableOptimizeRuntime.OptimizeStatus.FullOptimizing, optimizeTasks, OptimizeType.FullMajor);
+        } else if (hasMajorOptimizeTask()) {
+          tryUpdateOptimizeInfo(
+              TableOptimizeRuntime.OptimizeStatus.MajorOptimizing, optimizeTasks, OptimizeType.Major);
+        } else {
+          tryUpdateOptimizeInfo(
+              TableOptimizeRuntime.OptimizeStatus.MinorOptimizing, optimizeTasks, OptimizeType.Minor);
+        }
+        return true;
+      }
+    } finally {
+      tasksLock.unlock();
+    }
+    return true;
+  }
+
   /**
    * Refresh and update table optimize status.
    */
-  public void updateTableOptimizeStatus() {
-    if (!this.optimizeTasks.isEmpty()) {
-      tasksLock.lock();
-      try {
-        if (!this.optimizeTasks.isEmpty()) {
-          List<BaseOptimizeTask> optimizeTasks =
-              this.optimizeTasks.values().stream().map(OptimizeTaskItem::getOptimizeTask).collect(
-                  Collectors.toList());
-          if (hasFullOptimizeTask()) {
-            tryUpdateOptimizeInfo(
-                TableOptimizeRuntime.OptimizeStatus.FullOptimizing, optimizeTasks, OptimizeType.FullMajor);
-          } else if (hasMajorOptimizeTask()) {
-            tryUpdateOptimizeInfo(
-                TableOptimizeRuntime.OptimizeStatus.MajorOptimizing, optimizeTasks, OptimizeType.Major);
-          } else {
-            tryUpdateOptimizeInfo(
-                TableOptimizeRuntime.OptimizeStatus.MinorOptimizing, optimizeTasks, OptimizeType.Minor);
-          }
-          return;
-        }
-      } finally {
-        tasksLock.unlock();
-      }
+  public void updateTableOptimizeStatus(boolean withPlan) {
+    if (shouldContinueOptimizing()) {
+      return;
     }
-    // if optimizeTasks is empty
-    if (!CompatiblePropertyUtil
-        .propertyAsBoolean(getArcticTable(false).properties(), TableProperties.ENABLE_SELF_OPTIMIZING,
-            TableProperties.ENABLE_SELF_OPTIMIZING_DEFAULT)) {
-      tryUpdateOptimizeInfo(TableOptimizeRuntime.OptimizeStatus.Idle, Collections.emptyList(), null);
+
+    if (!withPlan || disabledOptimize()) {
+      // if optimizeTasks is empty
+        tryUpdateOptimizeInfo(TableOptimizeRuntime.OptimizeStatus.Idle, Collections.emptyList(), null);
     } else {
       if (com.netease.arctic.utils.TableTypeUtil.isIcebergTableFormat(getArcticTable())) {
-        List<FileScanTask> fileScanTasks = new ArrayList<>();
-        try (CloseableIterable<FileScanTask> filesIterable = arcticTable.asUnkeyedTable().newScan().planFiles()) {
-          filesIterable.forEach(t -> fileScanTasks.add(new LiteBaseFileScanTask(t)));
-        } catch (IOException e) {
-          throw new UncheckedIOException("Failed to close table scan of " + tableIdentifier, e);
-        }
-        IcebergFullOptimizePlan fullPlan = getIcebergFullPlan(fileScanTasks, -1, System.currentTimeMillis());
-        List<BaseOptimizeTask> fullTasks = fullPlan.plan();
-        // pending for full optimize
-        if (CollectionUtils.isNotEmpty(fullTasks)) {
-          tryUpdateOptimizeInfo(
-              TableOptimizeRuntime.OptimizeStatus.Pending, fullTasks, OptimizeType.FullMajor);
-        } else {
-          IcebergMinorOptimizePlan minorPlan =
-              getIcebergMinorPlan(fileScanTasks, -1, System.currentTimeMillis());
+        updateAfterPlanIceberg();
+      } else {
+        updateAfterPlan();
+      }
+    }
+  }
+
+  private boolean disabledOptimize() {
+    return !CompatiblePropertyUtil
+        .propertyAsBoolean(getArcticTable(false).properties(), TableProperties.ENABLE_SELF_OPTIMIZING,
+            TableProperties.ENABLE_SELF_OPTIMIZING_DEFAULT);
+  }
+
+  public void updateTableOptimizeStatus() {
+    updateTableOptimizeStatus(true);
+  }
+
+  private void updateAfterPlanIceberg() {
+    List<FileScanTask> fileScanTasks = new ArrayList<>();
+    try (CloseableIterable<FileScanTask> filesIterable = arcticTable.asUnkeyedTable().newScan().planFiles()) {
+      filesIterable.forEach(t -> fileScanTasks.add(new LiteBaseFileScanTask(t)));
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to close table scan of " + tableIdentifier, e);
+    }
+    IcebergFullOptimizePlan fullPlan = getIcebergFullPlan(fileScanTasks, -1, System.currentTimeMillis());
+    List<BaseOptimizeTask> fullTasks = fullPlan.plan();
+    // pending for full optimize
+    if (CollectionUtils.isNotEmpty(fullTasks)) {
+      tryUpdateOptimizeInfo(
+          TableOptimizeRuntime.OptimizeStatus.Pending, fullTasks, OptimizeType.FullMajor);
+    } else {
+      IcebergMinorOptimizePlan minorPlan =
+          getIcebergMinorPlan(fileScanTasks, -1, System.currentTimeMillis());
+      List<BaseOptimizeTask> minorTasks = minorPlan.plan();
+      // pending for minor optimize
+      if (CollectionUtils.isNotEmpty(minorTasks)
+          && TableOptimizeStatusUtil.notIn(tableOptimizeRuntime.getOptimizeStatus(), TableOptimizeRuntime.OptimizeStatus.Idle)) {
+        tryUpdateOptimizeInfo(
+            TableOptimizeRuntime.OptimizeStatus.Pending, minorTasks, OptimizeType.Minor);
+      } else {
+        // idle state
+        tryUpdateOptimizeInfo(TableOptimizeRuntime.OptimizeStatus.Idle, Collections.emptyList(), null);
+      }
+    }
+  }
+
+  private void updateAfterPlan() {
+    FullOptimizePlan fullPlan = getFullPlan(-1, System.currentTimeMillis());
+    List<BaseOptimizeTask> fullTasks = fullPlan.plan();
+    // pending for full optimize
+    if (CollectionUtils.isNotEmpty(fullTasks)) {
+      tryUpdateOptimizeInfo(
+          TableOptimizeRuntime.OptimizeStatus.Pending, fullTasks, OptimizeType.FullMajor);
+    } else {
+      MajorOptimizePlan majorPlan = getMajorPlan(-1, System.currentTimeMillis());
+      List<BaseOptimizeTask> majorTasks = majorPlan.plan();
+      // pending for major optimize
+      if (CollectionUtils.isNotEmpty(majorTasks)) {
+        tryUpdateOptimizeInfo(
+            TableOptimizeRuntime.OptimizeStatus.Pending, majorTasks, OptimizeType.Major);
+      } else {
+        if (isKeyedTable()) {
+          MinorOptimizePlan minorPlan = getMinorPlan(-1, System.currentTimeMillis());
           List<BaseOptimizeTask> minorTasks = minorPlan.plan();
-          // pending for minor optimize
           if (CollectionUtils.isNotEmpty(minorTasks)) {
             tryUpdateOptimizeInfo(
                 TableOptimizeRuntime.OptimizeStatus.Pending, minorTasks, OptimizeType.Minor);
-          } else {
-            // idle state
-            tryUpdateOptimizeInfo(TableOptimizeRuntime.OptimizeStatus.Idle, Collections.emptyList(), null);
+            return;
           }
         }
-      } else {
-        FullOptimizePlan fullPlan = getFullPlan(-1, System.currentTimeMillis());
-        List<BaseOptimizeTask> fullTasks = fullPlan.plan();
-        // pending for full optimize
-        if (CollectionUtils.isNotEmpty(fullTasks)) {
-          tryUpdateOptimizeInfo(
-              TableOptimizeRuntime.OptimizeStatus.Pending, fullTasks, OptimizeType.FullMajor);
-        } else {
-          MajorOptimizePlan majorPlan = getMajorPlan(-1, System.currentTimeMillis());
-          List<BaseOptimizeTask> majorTasks = majorPlan.plan();
-          // pending for major optimize
-          if (CollectionUtils.isNotEmpty(majorTasks)) {
-            tryUpdateOptimizeInfo(
-                TableOptimizeRuntime.OptimizeStatus.Pending, majorTasks, OptimizeType.Major);
-          } else {
-            if (isKeyedTable()) {
-              MinorOptimizePlan minorPlan = getMinorPlan(-1, System.currentTimeMillis());
-              List<BaseOptimizeTask> minorTasks = minorPlan.plan();
-              if (CollectionUtils.isNotEmpty(minorTasks)) {
-                tryUpdateOptimizeInfo(
-                    TableOptimizeRuntime.OptimizeStatus.Pending, minorTasks, OptimizeType.Minor);
-                return;
-              }
-            }
-            // idle state
-            tryUpdateOptimizeInfo(TableOptimizeRuntime.OptimizeStatus.Idle, Collections.emptyList(), null);
-          }
-        }
+        // idle state
+        tryUpdateOptimizeInfo(TableOptimizeRuntime.OptimizeStatus.Idle, Collections.emptyList(), null);
       }
     }
   }
@@ -744,7 +768,7 @@ public class TableOptimizeItem extends IJDBCService {
       sqlSession.commit(true);
     }
 
-    updateTableOptimizeStatus();
+    updateTableOptimizeStatus(false);
   }
 
   private OptimizeHistory buildOptimizeRecord(Map<String, List<OptimizeTaskItem>> tasks, long commitTime) {
