@@ -56,13 +56,10 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.ibatis.session.SqlSession;
-import org.apache.iceberg.BaseMetastoreCatalog;
-import org.apache.iceberg.BaseMetastoreTableOperations;
 import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
-import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.iceberg.relocated.com.google.common.collect.Sets;
 import org.apache.log4j.Level;
 import org.apache.thrift.TException;
@@ -655,7 +652,7 @@ public class OptimizeQueueService extends IJDBCService {
             continue;
           }
 
-          if (tableItem.getTableOptimizeRuntime().isRunning()) {
+          if (tableItem.optimizeRunning()) {
             LOG.debug("{} is running continue", tableIdentifier);
 
             // add failed tasks and retry
@@ -672,12 +669,12 @@ public class OptimizeQueueService extends IJDBCService {
           BaseOptimizePlan optimizePlan;
           List<BaseOptimizeTask> optimizeTasks;
 
+          Map<String, Boolean> partitionIsRunning = tableItem.generatePartitionRunning();
           if (TableTypeUtil.isIcebergTableFormat(tableItem.getArcticTable(false))) {
             if (!BaseIcebergOptimizePlan.tableChanged(tableItem.getArcticTable(false),
                 tableItem.getTableOptimizeRuntime())) {
               tableItem.persistTableOptimizeRuntime();
-              LOG.debug("table {} not changed, no need plan",
-                  tableIdentifier);
+              LOG.debug("table {} not changed, no need plan", tableIdentifier);
               continue;
             }
             List<FileScanTask> fileScanTasks = new ArrayList<>();
@@ -688,26 +685,26 @@ public class OptimizeQueueService extends IJDBCService {
               throw new UncheckedIOException("Failed to close table scan of " + tableIdentifier, e);
             }
 
-            optimizePlan = tableItem.getIcebergFullPlan(fileScanTasks, queueId, currentTime);
+            optimizePlan = tableItem.getIcebergFullPlan(fileScanTasks, queueId, currentTime, partitionIsRunning);
             optimizeTasks = optimizePlan.plan();
             // if no major tasks, then plan minor tasks
             if (CollectionUtils.isEmpty(optimizeTasks)) {
-              optimizePlan = tableItem.getIcebergMinorPlan(fileScanTasks, queueId, currentTime);
+              optimizePlan = tableItem.getIcebergMinorPlan(fileScanTasks, queueId, currentTime, partitionIsRunning);
               optimizeTasks = optimizePlan.plan();
             }
           } else {
-            optimizePlan = tableItem.getFullPlan(queueId, currentTime);
+            optimizePlan = tableItem.getFullPlan(queueId, currentTime, partitionIsRunning);
             optimizeTasks = optimizePlan.plan();
 
             // if no full tasks, then plan minor tasks
             if (CollectionUtils.isEmpty(optimizeTasks)) {
-              optimizePlan = tableItem.getMajorPlan(queueId, currentTime);
+              optimizePlan = tableItem.getMajorPlan(queueId, currentTime, partitionIsRunning);
               optimizeTasks = optimizePlan.plan();
             }
 
             // if no major tasks and keyed table, then plan minor tasks
             if (tableItem.isKeyedTable() && CollectionUtils.isEmpty(optimizeTasks)) {
-              optimizePlan = tableItem.getMinorPlan(queueId, currentTime);
+              optimizePlan = tableItem.getMinorPlan(queueId, currentTime, partitionIsRunning);
               optimizeTasks = optimizePlan.plan();
             }
           }
@@ -826,7 +823,6 @@ public class OptimizeQueueService extends IJDBCService {
           }
 
           tableItem.getTableOptimizeRuntime().setLatestTaskPlanGroup(optimizeTasks.get(0).getTaskPlanGroup());
-          tableItem.getTableOptimizeRuntime().setRunning(true);
           tableItem.persistTableOptimizeRuntime();
         } catch (Throwable e) {
           tableItem.getTableOptimizeRuntime().restoreTableOptimizeRuntime(oldTableOptimizeRuntime);
