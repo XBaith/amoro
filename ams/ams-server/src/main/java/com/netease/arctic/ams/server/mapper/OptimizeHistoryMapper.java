@@ -44,7 +44,7 @@ public interface OptimizeHistoryMapper {
       "max_change_transaction_id from " + TABLE_NAME + " where " +
       "catalog_name = #{tableIdentifier.catalog} and db_name = #{tableIdentifier.database} " +
       "and table_name = #{tableIdentifier.tableName}" +
-      "order by commit_time desc")
+      "order by commit_time")
   @Results({
       @Result(property = "recordId", column = "history_id"),
       @Result(column = "optimize_range", property = "optimizeRange"),
