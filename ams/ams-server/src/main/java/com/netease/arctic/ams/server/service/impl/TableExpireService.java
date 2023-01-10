@@ -64,7 +64,7 @@ import java.util.stream.Collectors;
 
 public class TableExpireService implements ITableExpireService {
   private static final Logger LOG = LoggerFactory.getLogger(TableExpireService.class);
-  private static final long EXPIRE_INTERVAL = 3600_000; // 1 hour
+  private static final long EXPIRE_INTERVAL = 6 * 3600_000; // 6 hour
 
   private ScheduledTasks<TableIdentifier, TableExpireTask> cleanTasks;
 
