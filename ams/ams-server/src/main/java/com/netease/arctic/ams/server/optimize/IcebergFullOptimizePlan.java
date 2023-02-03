@@ -140,7 +140,7 @@ public class IcebergFullOptimizePlan extends BaseIcebergOptimizePlan {
         getOptimizeFile(fileScanTask, dataFiles, eqDeleteFiles, posDeleteFiles);
 
         collector.add(buildOptimizeTask(Collections.emptyList(), dataFiles,
-            eqDeleteFiles, posDeleteFiles, seqNumberFetcher(), taskPartitionConfig));
+            eqDeleteFiles, posDeleteFiles, taskPartitionConfig));
       }
     }
 

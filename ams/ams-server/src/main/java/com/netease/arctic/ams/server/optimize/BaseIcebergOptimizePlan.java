@@ -107,7 +107,6 @@ public abstract class BaseIcebergOptimizePlan extends BaseOptimizePlan {
                                                List<DataFile> baseFiles,
                                                List<DeleteFile> eqDeleteFiles,
                                                List<DeleteFile> posDeleteFiles,
-                                               SequenceNumberFetcher sequenceNumberFetcher,
                                                TaskConfig taskConfig) {
     // build task
     BaseOptimizeTask optimizeTask = new BaseOptimizeTask();

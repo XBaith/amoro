@@ -177,7 +177,7 @@ public class IcebergMinorOptimizePlan extends BaseIcebergOptimizePlan {
         int totalFileCnt = dataFiles.size() + eqDeleteFiles.size() + posDeleteFiles.size();
         if (totalFileCnt > 1) {
           collector.add(buildOptimizeTask(dataFiles, Collections.emptyList(),
-              eqDeleteFiles, posDeleteFiles, seqNumberFetcher(), taskPartitionConfig));
+              eqDeleteFiles, posDeleteFiles, taskPartitionConfig));
         }
       }
     }
@@ -211,7 +211,7 @@ public class IcebergMinorOptimizePlan extends BaseIcebergOptimizePlan {
         Preconditions.checkArgument(totalFileCnt > 1, "task only have " + totalFileCnt + " files");
 
         collector.add(buildOptimizeTask(Collections.emptyList(), dataFiles,
-            eqDeleteFiles, posDeleteFiles, seqNumberFetcher(), taskPartitionConfig));
+            eqDeleteFiles, posDeleteFiles, taskPartitionConfig));
       }
     }
 
