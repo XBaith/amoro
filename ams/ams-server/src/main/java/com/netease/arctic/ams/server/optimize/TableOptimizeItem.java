@@ -844,12 +844,22 @@ public class TableOptimizeItem extends IJDBCService {
    * If task execute timeout, set it to be Failed.
    */
   public void checkTaskExecuteTimeout() {
-    optimizeTasks.values().stream().filter(OptimizeTaskItem::executeTimeout)
-        .forEach(task -> {
-          task.onFailed(new ErrorMessage(System.currentTimeMillis(), "execute expired"),
-              System.currentTimeMillis() - task.getOptimizeRuntime().getExecuteTime());
-          LOG.error("{} execute timeout, change to Failed", task.getTaskId());
-        });
+    tasksLock.lock();
+    try {
+      optimizeTasks.values().stream().filter(OptimizeTaskItem::executeTimeout)
+          .forEach(task -> {
+            task.onFailed(new ErrorMessage(System.currentTimeMillis(), "execute expired"),
+                System.currentTimeMillis() - task.getOptimizeRuntime().getExecuteTime());
+            LOG.error("{} execute timeout, change to Failed", task.getTaskId());
+            if (task.getOptimizeRuntime().getRetry() > optimizeMaxRetry()) {
+              LOG.error("{} execute timeout and maximum number of retries exceeded, clean tasks",
+                  getArcticTable().id());
+              clearOptimizeTasks();
+            }
+          });
+    } finally {
+      tasksLock.unlock();
+    }
   }
 
   /**
