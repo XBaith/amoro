@@ -53,6 +53,7 @@ public class OptimizeCheckTask implements ScheduledTasks.Task {
 
   private void check(TableOptimizeItem tableOptimize) {
     LOG.debug("{} start check", tableOptimize.getTableIdentifier());
+    tableOptimize.checkOptimizeEnable();
     tableOptimize.checkTaskExecuteTimeout();
     tableOptimize.checkOptimizeGroup();
     tableOptimize.tryTriggerCommit();

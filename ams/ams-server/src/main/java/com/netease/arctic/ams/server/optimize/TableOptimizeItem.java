@@ -1094,4 +1094,19 @@ public class TableOptimizeItem extends IJDBCService {
     OptimizeTaskItem optimizeTaskItem = new ArrayList<>(optimizeTasks.values()).get(0);
     return optimizeTaskItem.getTaskId().getType() == OptimizeType.Minor;
   }
+
+  public void checkOptimizeEnable() {
+    boolean enable = CompatiblePropertyUtil.propertyAsBoolean(getArcticTable().properties(),
+        TableProperties.ENABLE_SELF_OPTIMIZING,
+        TableProperties.ENABLE_SELF_OPTIMIZING_DEFAULT);
+
+    if (!enable) {
+      ServiceContainer.getOptimizeService().clearRemovedTables(Lists.newArrayList(getTableIdentifier()));
+    } else {
+      List<TableIdentifier> cachedTables = ServiceContainer.getOptimizeService().listCachedTables();
+      if (!cachedTables.contains(getTableIdentifier())) {
+        ServiceContainer.getOptimizeService().addNewTables(Lists.newArrayList(getTableIdentifier()));
+      }
+    }
+  }
 }
