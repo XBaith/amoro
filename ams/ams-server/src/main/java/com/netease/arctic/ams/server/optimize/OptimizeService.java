@@ -49,7 +49,6 @@ import com.netease.arctic.utils.CatalogUtil;
 import com.netease.arctic.utils.CompatiblePropertyUtil;
 import java.util.concurrent.Executors;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.iceberg.util.PropertyUtil;
 import org.apache.iceberg.util.Tasks;
@@ -228,11 +227,11 @@ public class OptimizeService extends IJDBCService implements IOptimizeService {
 
     // load tables from catalog
     Set<TableIdentifier> tableIdentifiers = com.netease.arctic.ams.server.utils.CatalogUtil.loadTablesFromCatalog();
-
+    int parallelism = ServiceContainer.getCatalogMetadataService().getCatalogs().size() + 1;
     Tasks.foreach(tableIdentifiers)
         .suppressFailureWhenFinished()
         .noRetry()
-        .executeWith(Executors.newFixedThreadPool(5))
+        .executeWith(Executors.newFixedThreadPool(parallelism))
         .run(tableIdentifier -> {
           List<OptimizeTaskItem> tableOptimizeTasks = optimizeTasks.remove(tableIdentifier);
 
@@ -242,7 +241,8 @@ public class OptimizeService extends IJDBCService implements IOptimizeService {
 
           TableMetadata tableMetadata = buildTableMetadata(arcticCatalog, arcticTable);
 
-          if (CompatiblePropertyUtil.propertyAsBoolean(tableMetadata.getProperties(), TableProperties.ENABLE_SELF_OPTIMIZING,
+          if (CompatiblePropertyUtil.propertyAsBoolean(tableMetadata.getProperties(),
+              TableProperties.ENABLE_SELF_OPTIMIZING,
               TableProperties.ENABLE_SELF_OPTIMIZING_DEFAULT)) {
             TableOptimizeItem arcticTableItem = new TableOptimizeItem(null, tableMetadata);
             TableOptimizeRuntime oldTableOptimizeRuntime = tableOptimizeRuntimes.remove(tableIdentifier);
@@ -312,34 +312,30 @@ public class OptimizeService extends IJDBCService implements IOptimizeService {
       return;
     }
 
-    toAddTables.stream().map(toAddTable -> {
-      ArcticCatalog arcticCatalog =
-          com.netease.arctic.ams.server.utils.CatalogUtil.getArcticCatalog(toAddTable.getCatalog());
-        ArcticTable arcticTable;
-        try {
-          arcticTable = arcticCatalog.loadTable(toAddTable);
-          return Pair.of(arcticTable, buildTableMetadata(arcticCatalog, arcticTable));
-        } catch (Exception e) {
-          LOG.error("Fail to load table {}", toAddTable);
-        }
-
-        return null;
-    }).filter(tuple -> tuple != null &&
-        CompatiblePropertyUtil.propertyAsBoolean(
-            tuple.getValue().getProperties(),
-            TableProperties.ENABLE_SELF_OPTIMIZING,
-            TableProperties.ENABLE_SELF_OPTIMIZING_DEFAULT)
-    ).forEach(tuple -> {
-        ArcticTable arcticTable = tuple.getKey();
-        TableMetadata tableMetadata = tuple.getValue();
-        TableOptimizeItem newTableItem = new TableOptimizeItem(arcticTable, tableMetadata);
-        long createTime =
-            PropertyUtil.propertyAsLong(tableMetadata.getProperties(), TableProperties.TABLE_CREATE_TIME,
-                TableProperties.TABLE_CREATE_TIME_DEFAULT);
-        newTableItem.getTableOptimizeRuntime().setOptimizeStatusStartTime(createTime);
-        addTableIntoCache(newTableItem, arcticTable.properties(), true);
-      LOG.info("Add a new table: {}", arcticTable.id());
-    });
+    int parallelism = ServiceContainer.getCatalogMetadataService().getCatalogs().size() + 1;
+    Tasks.foreach(toAddTables)
+        .suppressFailureWhenFinished()
+        .noRetry()
+        .executeWith(Executors.newFixedThreadPool(parallelism))
+        .run(toAddTable -> {
+          ArcticCatalog arcticCatalog =
+              com.netease.arctic.ams.server.utils.CatalogUtil.getArcticCatalog(toAddTable.getCatalog());
+          ArcticTable arcticTable = arcticCatalog.loadTable(toAddTable);
+          TableMetadata tableMetadata = buildTableMetadata(arcticCatalog, arcticTable);
+          if (CompatiblePropertyUtil.propertyAsBoolean(
+              tableMetadata.getProperties(),
+              TableProperties.ENABLE_SELF_OPTIMIZING,
+              TableProperties.ENABLE_SELF_OPTIMIZING_DEFAULT)) {
+            TableOptimizeItem newTableItem = new TableOptimizeItem(arcticTable, tableMetadata);
+            long createTime =
+                PropertyUtil.propertyAsLong(tableMetadata.getProperties(),
+                    TableProperties.TABLE_CREATE_TIME,
+                    TableProperties.TABLE_CREATE_TIME_DEFAULT);
+            newTableItem.getTableOptimizeRuntime().setOptimizeStatusStartTime(createTime);
+            addTableIntoCache(newTableItem, arcticTable.properties(), true);
+            LOG.info("Add a new table: {}", arcticTable.id());
+          }
+        });
   }
 
   @Override
