@@ -35,12 +35,12 @@
 
     <properties>
         <powermock.version>2.0.2</powermock.version>
-        <fastjson.version>1.2.75</fastjson.version>
+        <fastjson.version>1.2.83</fastjson.version>
         <netty.version>4.1.56.Final</netty.version>
         <websocket.version>9.4.46.v20220331</websocket.version>
         <jetty.verison>9.4.46.v20220331</jetty.verison>
-        <kotlin.version>1.5.32</kotlin.version>
-        <spark.version>3.1.1</spark.version>
+        <kotlin.version>1.6.0</kotlin.version>
+        <spark.version>3.3.3</spark.version>
         <jline.version>3.22.0</jline.version>
     </properties>
 
@@ -211,7 +211,7 @@
         <dependency>
             <groupId>org.mybatis</groupId>
             <artifactId>mybatis</artifactId>
-            <version>3.5.5</version>
+            <version>3.5.6</version>
         </dependency>
 
         <dependency>
@@ -340,7 +340,7 @@
         <dependency>
             <groupId>org.yaml</groupId>
             <artifactId>snakeyaml</artifactId>
-            <version>1.30</version>
+            <version>2.0</version>
         </dependency>
 
         <!--restful frame -->
@@ -391,7 +391,7 @@
         <dependency>
             <groupId>org.apache.derby</groupId>
             <artifactId>derby</artifactId>
-            <version>10.13.1.1</version>
+            <version>10.17.1.0</version>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
