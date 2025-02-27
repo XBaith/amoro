@@ -94,7 +94,7 @@
         <maven-dependency-plugin.version>3.3.0</maven-dependency-plugin.version>
         <maven-antrun-plugin.version>3.0.0</maven-antrun-plugin.version>
         <maven-jacoco-plugin.version>0.8.7</maven-jacoco-plugin.version>
-        <maven-spotless-plugin.version>2.27.2</maven-spotless-plugin.version>
+        <maven-spotless-plugin.version>2.44.3</maven-spotless-plugin.version>
         <maven-thrift-plugin.version>0.1.11</maven-thrift-plugin.version>
         <maven-build-helper-plugin.version>3.2.0</maven-build-helper-plugin.version>
         <maven-apache-rat-plugin.version>0.15</maven-apache-rat-plugin.version>
@@ -103,7 +103,7 @@
 
         <iceberg.version>1.6.1</iceberg.version>
         <paimon.version>0.9.0</paimon.version>
-        <hive.version>3.1.1</hive.version>
+        <hive.version>4.0.1</hive.version>
         <hadoop.version>3.4.0</hadoop.version>
         <kerby.version>2.0.3</kerby.version>
         <scala.binary.version>2.12</scala.binary.version>
@@ -122,14 +122,14 @@
         <orc-core.version>1.8.3</orc-core.version>
         <awssdk.version>2.24.12</awssdk.version>
         <aliyun-sdk-oss.version>3.10.2</aliyun-sdk-oss.version>
-        <terminal.spark.version>3.3.2</terminal.spark.version>
+        <terminal.spark.version>3.3.3</terminal.spark.version>
         <terminal.spark.major.version>3.3</terminal.spark.major.version>
         <dropwizard.metrics.version>4.2.19</dropwizard.metrics.version>
         <caffeine.version>2.9.3</caffeine.version>
         <snakeyaml.version>2.2</snakeyaml.version>
         <mybatis.version>3.5.15</mybatis.version>
         <postgres-jdbc.version>42.7.2</postgres-jdbc.version>
-        <derby-jdbc.version>10.14.2.0</derby-jdbc.version>
+        <derby-jdbc.version>10.17.1.0</derby-jdbc.version>
         <commons-dbcp2.version>2.9.0</commons-dbcp2.version>
         <netty.version>4.1.86.Final</netty.version>
         <javalin.version>4.6.8</javalin.version>
